@@ -1,6 +1,4 @@
-# SOPS Configuration for Nextcloud
 creation_rules:
-  - path_regex: .*secrets.*\.(yaml|yml)$
-    age: >-
-      age14c4u5y4uf869su746ghhear0ys4p6fuj6r0pvzrujj03dwh3xals40k30e
-    encrypted_regex: '^(data|stringData)$'
+  - path_regex: .*secrets.*\.yaml$
+    age: age12w6hdx8fxq5g7x6x6ujh9ve6je4tlq0m9rhyrrt20vcjhzwkmqvsgfwk9u
+    encrypted_regex: ^(data|stringData)$
