@@ -34,7 +34,20 @@ Complete guide from code to production deployment using GitOps with ArgoCD and S
 
 ```bash
 # Required on your local machine
-sudo dnf install -y sops age
+sudo dnf install -y epel-release
+sudo dnf install -y age
+
+# Download the latest sops binary
+SOPS_VERSION="3.11.0"  # Check for latest at github.com/getsops/sops/releases
+curl -LO https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64
+
+# Make it executable and move to PATH
+chmod +x sops-v${SOPS_VERSION}.linux.amd64
+sudo mv sops-v${SOPS_VERSION}.linux.amd64 /usr/local/bin/sops
+
+# Verify installation
+sops --version
+age --version
 ```
 
 ### Verify Cluster Access
@@ -52,19 +65,39 @@ kubectl get pods -n argocd
 ### 1. Clone/Fork Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-cd YOUR_REPO
+git clone https://github.com/aaronwittchen/nextcloud.git
+cd nextcloud
 ```
 
 ## SOPS Encryption
 
 ### 1. Locate Your AGE Key
 
+# Create the directory
+
+mkdir -p ~/.config/sops/age
+
+# Generate a new age key pair
+
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Secure the permissions
+
+chmod 600 ~/.config/sops/age/keys.txt
+
+# View your NEW public key
+
+age-keygen -y ~/.config/sops/age/keys.txt
+
+```
+
 Your AGE public key (from `.sops.yaml`):
 
 ```
+
 age14c4u5y4uf869su746ghhear0ys4p6fuj6r0pvzrujj03dwh3xals40k30e
-```
+
+````
 
 Your private key should be stored securely (e.g., `~/.config/sops/age/keys.txt`).
 
@@ -76,49 +109,23 @@ export SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt
 
 # Verify SOPS can find the key
 sops --version
-```
+````
 
 ### 3. Edit Secrets
 
 ```bash
 # Open secrets file
-nano nextcloud/base/secrets.yaml
-```
-
-Update the placeholder values:
-
-```yaml
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-  namespace: nextcloud
-type: Opaque
-stringData:
-  POSTGRES_USER: nextcloud
-  POSTGRES_PASSWORD: 'your-secure-database-password-here' # CHANGE THIS
-  POSTGRES_DB: nextcloud
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: nextcloud-secret
-  namespace: nextcloud
-type: Opaque
-stringData:
-  NEXTCLOUD_ADMIN_USER: admin
-  NEXTCLOUD_ADMIN_PASSWORD: 'your-secure-admin-password-here' # CHANGE THIS
+nano base/secrets.yaml
 ```
 
 ### 4. Encrypt Secrets
 
 ```bash
 # Encrypt in-place
-sops -e -i nextcloud/base/secrets.yaml
+sops -e -i base/secrets.yaml
 
 # Verify encryption (should show ENC[AES256_GCM,...])
-cat nextcloud/base/secrets.yaml
+cat base/secrets.yaml
 ```
 
 **Expected output after encryption:**
@@ -146,7 +153,7 @@ sops:
 
 ```bash
 # Decrypt to stdout (doesn't modify file)
-sops -d nextcloud/base/secrets.yaml
+sops -d base/secrets.yaml
 ```
 
 ### 6. Commit Encrypted Secrets
@@ -204,12 +211,12 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: homelab
+  project: default
 
   source:
-    repoURL: https://github.com/YOUR_USERNAME/YOUR_REPO.git # <-- UPDATE THIS
-    targetRevision: main
-    path: nextcloud/overlays/longhorn
+    repoURL: https://github.com/aaronwittchen/nextcloud.git
+    targetRevision: master
+    path: overlays/longhorn
 
   destination:
     server: https://kubernetes.default.svc
@@ -228,7 +235,7 @@ spec:
 **Option A: Via kubectl**
 
 ```bash
-kubectl apply -f ArgoCD/applications/nextcloud.yaml
+kubectl apply -f applications/nextcloud.yaml
 ```
 
 **Option B: Via ArgoCD CLI**

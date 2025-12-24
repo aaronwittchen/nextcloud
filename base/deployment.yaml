@@ -220,6 +220,8 @@ spec:
                 - /bin/sh
                 - -c
                 - php -f /var/www/html/cron.php
+              securityContext:
+                runAsUser: 33
               resources:
                 requests:
                   memory: '128Mi'
