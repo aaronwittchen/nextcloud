@@ -12,7 +12,7 @@ spec:
     - name: eg
       namespace: envoy-gateway-system
   hostnames:
-    - "nextcloud.k8s.home"
+    - 'nextcloud.k8s.home'
   rules:
     - matches:
         - path:
@@ -24,3 +24,4 @@ spec:
       timeouts:
         request: 300s
         backendRequest: 300s
+        connectTimeout: 30s
