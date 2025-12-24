@@ -6,13 +6,16 @@ namespace: nextcloud
 resources:
   - namespace.yaml
   - service-accounts.yaml
-  - secrets.yaml
   - pvcs.yaml
   - postgres-config.yaml
   - postgres.yaml
   - redis.yaml
   - deployment.yaml
   - httproute.yaml
+
+# KSOPS generator for decrypting SOPS-encrypted secrets
+generators:
+  - ksops-generator.yaml
 
 labels:
   - pairs:
