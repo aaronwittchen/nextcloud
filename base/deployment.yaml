@@ -148,10 +148,10 @@ spec:
               httpHeaders:
                 - name: Host
                   value: nextcloud.k8s.home
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 15
+            failureThreshold: 6
           volumeMounts:
             - name: nextcloud-data
               mountPath: /var/www/html
@@ -212,6 +212,13 @@ spec:
           serviceAccountName: nextcloud-cron
           securityContext:
             fsGroup: 33
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: nextcloud
+                  topologyKey: kubernetes.io/hostname
           containers:
             - name: cron
               image: nextcloud:30-apache
