@@ -137,9 +137,9 @@ spec:
               httpHeaders:
                 - name: Host
                   value: nextcloud.k8s.home
-            initialDelaySeconds: 120
+            initialDelaySeconds: 180
             periodSeconds: 30
-            timeoutSeconds: 10
+            timeoutSeconds: 20
             failureThreshold: 5
           readinessProbe:
             httpGet:
