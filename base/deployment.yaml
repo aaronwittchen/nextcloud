@@ -139,7 +139,7 @@ spec:
                   value: nextcloud.k8s.home
             initialDelaySeconds: 180
             periodSeconds: 30
-            timeoutSeconds: 20
+            timeoutSeconds: 30
             failureThreshold: 5
           readinessProbe:
             httpGet:
@@ -150,7 +150,7 @@ spec:
                   value: nextcloud.k8s.home
             initialDelaySeconds: 90
             periodSeconds: 15
-            timeoutSeconds: 15
+            timeoutSeconds: 30
             failureThreshold: 6
           volumeMounts:
             - name: nextcloud-data
@@ -212,13 +212,6 @@ spec:
           serviceAccountName: nextcloud-cron
           securityContext:
             fsGroup: 33
-          affinity:
-            podAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchLabels:
-                      app: nextcloud
-                  topologyKey: kubernetes.io/hostname
           containers:
             - name: cron
               image: nextcloud:30-apache
@@ -232,7 +225,7 @@ spec:
               resources:
                 requests:
                   memory: '128Mi'
-                  cpu: '50m'
+                  cpu: '25m'
                 limits:
                   memory: '256Mi'
                   cpu: '200m'
