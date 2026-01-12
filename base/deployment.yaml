@@ -1,0 +1,246 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextcloud
+  namespace: nextcloud
+  labels:
+    app: nextcloud
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nextcloud
+  template:
+    metadata:
+      labels:
+        app: nextcloud
+    spec:
+      serviceAccountName: nextcloud
+      securityContext:
+        fsGroup: 33
+      terminationGracePeriodSeconds: 60
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER"; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready"
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+          resources:
+            requests:
+              memory: '32Mi'
+              cpu: '10m'
+            limits:
+              memory: '64Mi'
+              cpu: '50m'
+        - name: wait-for-redis
+          image: redis:7-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until redis-cli -h redis ping; do
+                echo "Waiting for Redis..."
+                sleep 2
+              done
+              echo "Redis is ready"
+          resources:
+            requests:
+              memory: '32Mi'
+              cpu: '10m'
+            limits:
+              memory: '64Mi'
+              cpu: '50m'
+      containers:
+        - name: nextcloud
+          image: nextcloud:30-apache
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+          env:
+            # Database Configuration
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            # Redis Configuration
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_HOST_PORT
+              value: '6379'
+            # Nextcloud Configuration
+            - name: NEXTCLOUD_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-secret
+                  key: NEXTCLOUD_ADMIN_USER
+            - name: NEXTCLOUD_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-secret
+                  key: NEXTCLOUD_ADMIN_PASSWORD
+            - name: NEXTCLOUD_TRUSTED_DOMAINS
+              value: 'nextcloud.k8s.local'
+            - name: OVERWRITEPROTOCOL
+              value: 'https'
+            - name: OVERWRITEHOST
+              value: 'nextcloud.k8s.local'
+            - name: TRUSTED_PROXIES
+              value: '10.244.0.0/16'
+            # PHP Configuration
+            - name: PHP_MEMORY_LIMIT
+              value: '512M'
+            - name: PHP_UPLOAD_LIMIT
+              value: '16G'
+          resources:
+            requests:
+              memory: '512Mi'
+              cpu: '200m'
+            limits:
+              memory: '1Gi'
+              cpu: '1000m'
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+          livenessProbe:
+            httpGet:
+              path: /status.php
+              port: 80
+              httpHeaders:
+                - name: Host
+                  value: nextcloud.k8s.local
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 30
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /status.php
+              port: 80
+              httpHeaders:
+                - name: Host
+                  value: nextcloud.k8s.local
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 30
+            failureThreshold: 6
+          volumeMounts:
+            - name: nextcloud-data
+              mountPath: /var/www/html
+            - name: apache-config
+              mountPath: /etc/apache2/conf-enabled/remoteip.conf
+              subPath: remoteip.conf
+      volumes:
+        - name: nextcloud-data
+          persistentVolumeClaim:
+            claimName: nextcloud-data-pvc
+        - name: apache-config
+          configMap:
+            name: nextcloud-apache-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextcloud
+  namespace: nextcloud
+spec:
+  type: ClusterIP
+  selector:
+    app: nextcloud
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nextcloud-apache-config
+  namespace: nextcloud
+data:
+  remoteip.conf: |
+    RemoteIPHeader X-Forwarded-For
+    RemoteIPTrustedProxy 10.244.0.0/16
+    RemoteIPTrustedProxy 10.96.0.0/12
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nextcloud-cron
+  namespace: nextcloud
+spec:
+  schedule: '*/5 * * * *'
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: nextcloud-cron
+        spec:
+          serviceAccountName: nextcloud-cron
+          securityContext:
+            fsGroup: 33
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: nextcloud
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: cron
+              image: nextcloud:30-apache
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - php -f /var/www/html/cron.php
+              securityContext:
+                runAsUser: 33
+              resources:
+                requests:
+                  memory: '128Mi'
+                  cpu: '25m'
+                limits:
+                  memory: '256Mi'
+                  cpu: '200m'
+              volumeMounts:
+                - name: nextcloud-data
+                  mountPath: /var/www/html
+          volumes:
+            - name: nextcloud-data
+              persistentVolumeClaim:
+                claimName: nextcloud-data-pvc
+          restartPolicy: OnFailure

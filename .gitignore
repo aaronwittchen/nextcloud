@@ -1,0 +1,56 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Secrets - never commit unencrypted!
+# base/secrets.yaml is SOPS encrypted and safe to commit
+!base/secrets.yaml
+*-secret.yaml
+!optional/secrets.example.yaml
+
+# Node.js
+node_modules/
+.npm/
+.yarn/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.output/
+.nuxt/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Misc
+*.local
+*.bak
+*.tmp
+nul

@@ -1,0 +1,12 @@
+# KSOPS Generator for Nextcloud Secrets
+# This file tells KSOPS to decrypt the SOPS-encrypted secrets.yaml
+apiVersion: viaduct.ai/v1
+kind: ksops
+metadata:
+  name: nextcloud-secrets-generator
+  annotations:
+    config.kubernetes.io/function: |
+      exec:
+        path: ksops
+files:
+  - ./secrets.yaml
