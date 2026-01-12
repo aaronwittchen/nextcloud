@@ -17,6 +17,7 @@ spec:
         app: postgres
     spec:
       serviceAccountName: postgres
+      automountServiceAccountToken: false
       securityContext:
         runAsUser: 999
         runAsGroup: 999
@@ -59,21 +60,17 @@ spec:
             requests:
               memory: '256Mi'
               cpu: '100m'
+              ephemeral-storage: '256Mi'
             limits:
               memory: '512Mi'
               cpu: '500m'
+              ephemeral-storage: '1Gi'
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL
-              add:
-                - CHOWN
-                - DAC_OVERRIDE
-                - FOWNER
-                - SETGID
-                - SETUID
           livenessProbe:
             exec:
               command:
@@ -153,6 +150,7 @@ spec:
             app: postgres-backup
         spec:
           serviceAccountName: postgres-backup
+          automountServiceAccountToken: false
           securityContext:
             runAsUser: 1000
             runAsGroup: 1000
@@ -212,9 +210,11 @@ spec:
                 requests:
                   memory: '128Mi'
                   cpu: '50m'
+                  ephemeral-storage: '256Mi'
                 limits:
                   memory: '256Mi'
                   cpu: '100m'
+                  ephemeral-storage: '512Mi'
               volumeMounts:
                 - name: postgres-backup
                   mountPath: /var/lib/postgresql/backups
