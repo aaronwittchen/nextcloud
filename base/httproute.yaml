@@ -24,4 +24,3 @@ spec:
       timeouts:
         request: 300s
         backendRequest: 300s
-        connectTimeout: 30s

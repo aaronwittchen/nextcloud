@@ -2,5 +2,5 @@
 creation_rules:
   - path_regex: .*\.(yaml|yml|json|env|ini)$
     age: >-
-      age13gwk9j9ddstm8ss9n2u8nx6ruh6zgafsapepmjz353tuarwu23hsqffl6t
+      age1tyqgw9lv8r7p2ewjznt8rw8050ysp63vletzy2w3hxfa7dzqdu6qdqwsl4
     encrypted_regex: '^(data|stringData|password|token|key|secret|apiKey|apiToken|credential)$'
