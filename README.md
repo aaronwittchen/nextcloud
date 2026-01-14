@@ -16,7 +16,8 @@ Production-ready Nextcloud deployment for Kubernetes with PostgreSQL and Redis.
    - DNS configured for `nextcloud.k8s.local`
 
 2. SOPS and age for secrets encryption
-3. ArgoCD with KSOPS plugin (for GitOps deployment)
+3. Kustomize with KSOPS plugin (for local deployment)
+4. ArgoCD with KSOPS plugin (for GitOps deployment)
 
 ## Quick Start
 
@@ -51,14 +52,54 @@ git push
 kubectl apply -f /path/to/ArgoCD/applications/nextcloud.yaml
 ```
 
-**Option B: Kustomize**
+**Option B: Kustomize with KSOPS**
+
+The built-in `kubectl apply -k` does not support external plugins like KSOPS. You need standalone kustomize with plugins enabled.
+
+**Install Dependencies (Arch Linux):**
 
 ```bash
-# For Longhorn storage (production)
-kubectl apply -k overlays/longhorn
+yay -S kustomize kustomize-sops
+```
+
+**Setup AGE Key:**
+
+```bash
+# Create key directory
+mkdir -p ~/.config/sops/age
+
+# Generate new key (or copy existing key)
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Note: Update .sops.yaml with your new public key if generating fresh
+```
+
+**Deploy:**
+
+```bash
+# Set environment and run kustomize with KSOPS
+PATH="/opt/kustomize/viaduct.ai/v1/ksops:$PATH" \
+KUSTOMIZE_PLUGIN_HOME=/opt/kustomize \
+kustomize build --enable-alpha-plugins --enable-exec overlays/longhorn | kubectl apply -f -
 
 # For local-path storage (testing)
-kubectl apply -k overlays/local-path
+PATH="/opt/kustomize/viaduct.ai/v1/ksops:$PATH" \
+KUSTOMIZE_PLUGIN_HOME=/opt/kustomize \
+kustomize build --enable-alpha-plugins --enable-exec overlays/local-path | kubectl apply -f -
+```
+
+**Recommended Alias:**
+
+Add to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+alias kustomize-sops='PATH="/opt/kustomize/viaduct.ai/v1/ksops:$PATH" KUSTOMIZE_PLUGIN_HOME=/opt/kustomize kustomize'
+```
+
+Then deploy with:
+
+```bash
+kustomize-sops build --enable-alpha-plugins --enable-exec overlays/longhorn | kubectl apply -f -
 ```
 
 ### 3. Add DNS Record
@@ -138,19 +179,57 @@ Secrets are managed with SOPS encryption using age keys.
 | `postgres-secret` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` |
 | `nextcloud-secret` | `NEXTCLOUD_ADMIN_USER`, `NEXTCLOUD_ADMIN_PASSWORD` |
 
+### Initial Setup (New Key)
+
+```bash
+# 1. Generate AGE key
+mkdir -p ~/.config/sops/age
+age-keygen -o ~/.config/sops/age/keys.txt
+# Output: Public key: age1xxxxxxxxx...
+
+# 2. Update .sops.yaml with your public key
+#    Replace the age: field with your new public key
+
+# 3. Create plaintext secrets
+cat > /tmp/secrets-plain.yaml << 'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: nextcloud
+type: Opaque
+stringData:
+  POSTGRES_USER: nextcloud
+  POSTGRES_PASSWORD: 'YOUR_SECURE_PASSWORD_HERE'
+  POSTGRES_DB: nextcloud
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nextcloud-secret
+  namespace: nextcloud
+type: Opaque
+stringData:
+  NEXTCLOUD_ADMIN_USER: admin
+  NEXTCLOUD_ADMIN_PASSWORD: 'YOUR_SECURE_PASSWORD_HERE'
+EOF
+
+# 4. Encrypt and move to base/
+sops --encrypt /tmp/secrets-plain.yaml > base/secrets.yaml
+rm /tmp/secrets-plain.yaml
+```
+
 ### Encrypt/Decrypt
 
 ```bash
-export SOPS_AGE_KEY_FILE=~/age-key.txt
-
 # View decrypted content
 sops -d base/secrets.yaml
 
-# Edit encrypted file
+# Edit encrypted file (opens in $EDITOR)
 sops base/secrets.yaml
 
-# Encrypt new file
-sops -e -i base/secrets.yaml
+# Re-encrypt after changing .sops.yaml (e.g., new key)
+sops updatekeys base/secrets.yaml
 ```
 
 ## Common Operations
